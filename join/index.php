@@ -1,9 +1,9 @@
 <?php
-
 ini_set("display_errors", "Off");
 session_start();
+require('../dbconnect.php');
 
-if(!empty($_POST)) {
+if (!empty($_POST)) {
     //エラー項目の確認
     if ($_POST['name'] == '') {
         $error['name'] = 'blank';
@@ -22,25 +22,41 @@ if(!empty($_POST)) {
     }
 
     $fileName = $_FILES['image']['name'];
-    if(!empty($fileName)){
-        $ext = substr($fileName,-3);
-        if($ext != 'jpg' && $ext!='gif'){
-            $error['image']='type';
+    if (!empty($fileName)) {
+        $ext = substr($fileName, -3);
+        if ($ext != 'jpg' && $ext != 'gif') {
+            $error['image'] = 'type';
+        }
+    }
+
+    //重複アカウントのチェック
+    if (empty($error)) {
+        $member = $db->prepare('SELECT COUNT(*) AS cnt FROM members WHERE email=?');
+        $member->execute(array($_POST['email']));
+        $record = $member->fetch();
+        if ($record['cnt'] > 0) {
+            $error['email'] = 'duplicate';
         }
     }
 
 
-
     if (empty($error)) {
         //画像をアップロードする
-        $image = date('YmdHis').$_FILES['image']['name'];
-        move_uploaded_file($_FILES['image']['tmp_name'],'../member_picture/'.$image);
+        $image = date('YmdHis') . $_FILES['image']['name'];
+        move_uploaded_file($_FILES['image']['tmp_name'], '../member_picture/' . $image);
 
         $_SESSION['join'] = $_POST;
         $_SESSION['join']['image'] = $image;
         header('Location:check.php');
         exit();
     }
+}
+
+//書き直し
+
+if ($_REQUEST['action'] == 'rewrite') {
+    $_POST = $_SESSION['join'];
+    $error['rewrite'] = true;
 }
 
 ?>
@@ -61,6 +77,9 @@ if(!empty($_POST)) {
         </dd>
         <?php if ($error['email'] == 'blank'): ?>
             <p class="error">*メールアドレスを入力してください</p>
+        <?php endif; ?>
+        <?php if ($error['email'] == 'duplicate'): ?>
+            <p class="error">*指定されたメールアドレスはすでに登録されています</p>
         <?php endif; ?>
         <dt>パスワード<span class="required">必須</dt>
         <dd><input type="password" name="password" size="10" maxlength="20"
